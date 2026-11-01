@@ -32,6 +32,21 @@ python3 vault_rag.py /path/to/obsidian-vault --query "Meta Ads daily budget rule
 python3 vault_rag.py /path/to/obsidian-vault -q "SOP Nazhir Wakaf" --json
 ```
 
+### 3. High-Confidence Search with Score Threshold
+```bash
+# Filter out low-relevance results using --min-score
+python3 vault_rag.py /path/to/obsidian-vault -q "Yoast SEO rules" --min-score 2.5
+```
+
+---
+
+## 🛠️ CLI Flags
+- `--query, -q`: Search terms to rank against indexed notes.
+- `--limit, -k`: Max items to return (default: 5).
+- `--min-score, -m`: Minimum BM25 cutoff threshold (default: 0.0).
+- `--json`: Output clean JSON array (progress logs automatically redirected to `stderr`).
+- `--quiet`: Suppress indexing progress output.
+
 ---
 
 ## 📄 License
