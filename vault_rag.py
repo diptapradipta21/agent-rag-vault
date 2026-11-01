@@ -27,8 +27,9 @@ class MarkdownRAGVault:
         words = re.findall(r'\b[a-zA-Z0-9_-]{2,}\b', text.lower())
         return words
 
-    def index(self, max_files=2000):
-        print(f"[*] Indexing Markdown vault: {self.vault_path}")
+    def index(self, max_files=2000, quiet=False):
+        if not quiet:
+            print(f"[*] Indexing Markdown vault: {self.vault_path}", file=sys.stderr)
         total_len = 0
         count = 0
         
@@ -51,6 +52,7 @@ class MarkdownRAGVault:
                     "rel_path": str(p.relative_to(self.vault_path)),
                     "abs_path": str(p),
                     "title": p.stem.replace("-", " ").replace("_", " ").title(),
+                    "title_tokens": set(self.tokenize(p.stem)),
                     "content": content,
                     "tokens": tokens,
                     "length": len(tokens)
@@ -69,10 +71,11 @@ class MarkdownRAGVault:
                 
         self.total_docs = len(self.documents)
         self.avg_doc_len = (total_len / self.total_docs) if self.total_docs > 0 else 0
-        print(f"[✓] Indexed {self.total_docs} markdown notes (Avg tokens: {self.avg_doc_len:.1f}).")
+        if not quiet:
+            print(f"[✓] Indexed {self.total_docs} markdown notes (Avg tokens: {self.avg_doc_len:.1f}).", file=sys.stderr)
 
-    def query(self, query_text: str, top_k: int = 5, k1: float = 1.5, b: float = 0.75):
-        """BM25 ranking query without embedding costs."""
+    def query(self, query_text: str, top_k: int = 5, k1: float = 1.5, b: float = 0.75, min_score: float = 0.0):
+        """BM25 ranking query with title-match boost and 0 token cost."""
         q_tokens = self.tokenize(query_text)
         if not q_tokens or self.total_docs == 0:
             return []
@@ -82,6 +85,7 @@ class MarkdownRAGVault:
             score = 0.0
             doc_len = doc["length"]
             term_counts = Counter(doc["tokens"])
+            title_tokens = doc.get("title_tokens", set())
             
             for term in q_tokens:
                 if term not in self.doc_freqs:
@@ -93,9 +97,15 @@ class MarkdownRAGVault:
                 # BM25 TF weight
                 numerator = tf * (k1 + 1)
                 denominator = tf + k1 * (1 - b + b * (doc_len / self.avg_doc_len))
-                score += idf * (numerator / denominator)
+                term_score = idf * (numerator / denominator)
                 
-            if score > 0:
+                # Title-match boost: 1.5x bonus if query term is in doc title
+                if term in title_tokens:
+                    term_score *= 1.5
+                    
+                score += term_score
+                
+            if score > min_score:
                 scores.append((doc, score))
 
         scores.sort(key=lambda x: x[1], reverse=True)
@@ -117,13 +127,15 @@ def main():
     parser.add_argument("vault", help="Path to local Markdown or Obsidian vault directory")
     parser.add_argument("--query", "-q", required=True, help="Search query to retrieve relevant context notes")
     parser.add_argument("--limit", "-k", type=int, default=5, help="Number of matching documents to return (default: 5)")
-    parser.add_argument("--json", action="store_true", help="Output results in JSON format for easy agent tool ingestion")
+    parser.add_argument("--min-score", "-m", type=float, default=0.0, help="Minimum BM25 score cutoff threshold (default: 0.0)")
+    parser.add_argument("--json", action="store_true", help="Output results in clean JSON format for agent tool ingestion")
+    parser.add_argument("--quiet", action="store_true", help="Suppress indexing progress output")
 
     args = parser.parse_args()
 
     vault = MarkdownRAGVault(args.vault)
-    vault.index()
-    results = vault.query(args.query, top_k=args.limit)
+    vault.index(quiet=(args.json or args.quiet))
+    results = vault.query(args.query, top_k=args.limit, min_score=args.min_score)
 
     if args.json:
         print(json.dumps(results, indent=2))
