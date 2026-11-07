@@ -51,3 +51,9 @@ python3 vault_rag.py /path/to/obsidian-vault -q "Yoast SEO rules" --min-score 2.
 
 ## 📄 License
 This project is open-source under the [MIT License](LICENSE).
+
+## 🧪 Testing
+
+```bash
+python3 -m unittest discover tests
+```

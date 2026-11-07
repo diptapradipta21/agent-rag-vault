@@ -44,7 +44,9 @@ class MarkdownRAGVault:
                 content = p.read_text(encoding="utf-8", errors="ignore")
                 if not content.strip():
                     continue
-                tokens = self.tokenize(content)
+                title_tokens = self.tokenize(p.stem)
+                content_tokens = self.tokenize(content)
+                tokens = title_tokens + content_tokens
                 if not tokens:
                     continue
                     
@@ -52,7 +54,7 @@ class MarkdownRAGVault:
                     "rel_path": str(p.relative_to(self.vault_path)),
                     "abs_path": str(p),
                     "title": p.stem.replace("-", " ").replace("_", " ").title(),
-                    "title_tokens": set(self.tokenize(p.stem)),
+                    "title_tokens": set(title_tokens),
                     "content": content,
                     "tokens": tokens,
                     "length": len(tokens)
