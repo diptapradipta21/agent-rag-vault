@@ -56,12 +56,35 @@ class TestMarkdownRAGVault(unittest.TestCase):
 
         results = vault.query("kubernetes", top_k=5)
         self.assertTrue(len(results) >= 2)
-        # Title boost should rank kubernetes.md first
         self.assertEqual(results[0]["title"], "Kubernetes")
 
-        # Test high cutoff
         strict_results = vault.query("kubernetes", top_k=5, min_score=999.0)
         self.assertEqual(len(strict_results), 0)
+
+    def test_tag_extraction_and_filtering(self):
+        doc1 = self.vault_path / "backend-ops.md"
+        doc1.write_text("---\ntags: [devops, infra]\n---\n# Server Setup\nManaging docker containers.", encoding="utf-8")
+
+        doc2 = self.vault_path / "billing-guide.md"
+        doc2.write_text("# Stripe Billing\nHandling recurring payments #finance #ops", encoding="utf-8")
+
+        vault = MarkdownRAGVault(str(self.vault_path))
+        vault.index(quiet=True)
+
+        # Both match generic query
+        all_results = vault.query("setup payments", top_k=5)
+        self.assertEqual(len(all_results), 2)
+
+        # Filter by tag
+        devops_results = vault.query("setup", tag="devops")
+        self.assertEqual(len(devops_results), 1)
+        self.assertEqual(devops_results[0]["title"], "Backend Ops")
+        self.assertIn("devops", devops_results[0]["tags"])
+
+        finance_results = vault.query("payments", tag="#finance")
+        self.assertEqual(len(finance_results), 1)
+        self.assertEqual(finance_results[0]["title"], "Billing Guide")
+        self.assertIn("finance", finance_results[0]["tags"])
 
 
 if __name__ == "__main__":
