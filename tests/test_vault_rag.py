@@ -87,5 +87,35 @@ class TestMarkdownRAGVault(unittest.TestCase):
         self.assertIn("finance", finance_results[0]["tags"])
 
 
+
+    def test_list_tags(self):
+        doc1 = self.vault_path / "doc1.md"
+        doc1.write_text("---\ntags: [devops, infra]\n---\n# Content 1", encoding="utf-8")
+        doc2 = self.vault_path / "doc2.md"
+        doc2.write_text("# Content 2\nTracking #devops and #monitoring", encoding="utf-8")
+
+        vault = MarkdownRAGVault(str(self.vault_path))
+        vault.index(quiet=True)
+        tags = vault.list_tags()
+
+        self.assertEqual(tags.get("devops"), 2)
+        self.assertEqual(tags.get("infra"), 1)
+        self.assertEqual(tags.get("monitoring"), 1)
+
+    def test_query_include_content(self):
+        doc1 = self.vault_path / "doc1.md"
+        body = "# Title 1\nThis is very special documentation body text."
+        doc1.write_text(body, encoding="utf-8")
+
+        vault = MarkdownRAGVault(str(self.vault_path))
+        vault.index(quiet=True)
+
+        res_no_content = vault.query("special documentation", top_k=1, include_content=False)
+        self.assertNotIn("content", res_no_content[0])
+
+        res_with_content = vault.query("special documentation", top_k=1, include_content=True)
+        self.assertIn("content", res_with_content[0])
+        self.assertEqual(res_with_content[0]["content"], body)
+
 if __name__ == "__main__":
     unittest.main()

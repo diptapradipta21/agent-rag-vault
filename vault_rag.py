@@ -128,6 +128,14 @@ class MarkdownRAGVault:
         if not quiet:
             print(f"[✓] Indexed {self.total_docs} notes (Avg tokens: {self.avg_doc_len:.1f}).", file=sys.stderr)
 
+    def list_tags(self) -> Dict[str, int]:
+        """Aggregate and count frequency of all tags across indexed documents."""
+        tag_counts: Counter = Counter()
+        for doc in self.documents:
+            for t in doc.get("tags", set()):
+                tag_counts[t] += 1
+        return dict(sorted(tag_counts.items(), key=lambda x: (-x[1], x[0])))
+
     def query(
         self,
         query_text: str,
@@ -135,7 +143,8 @@ class MarkdownRAGVault:
         k1: float = 1.5,
         b: float = 0.75,
         min_score: float = 0.0,
-        tag: Optional[str] = None
+        tag: Optional[str] = None,
+        include_content: bool = False
     ) -> List[Dict[str, Any]]:
         """BM25 ranking query with title-match boost, tag filtering, and 0 token cost."""
         q_tokens = self.tokenize(query_text)
@@ -181,20 +190,25 @@ class MarkdownRAGVault:
             # Extract high-relevance excerpt
             lines = [l.strip() for l in doc["content"].split("\n") if l.strip() and not l.startswith("#")]
             excerpt = " ".join(lines[:3])[:280] + "..." if lines else doc["content"][:280]
-            results.append({
+            entry: Dict[str, Any] = {
                 "score": round(sc, 3),
                 "title": doc["title"],
                 "path": doc["rel_path"],
                 "tags": sorted(list(doc.get("tags", set()))),
                 "excerpt": excerpt
-            })
+            }
+            if include_content:
+                entry["content"] = doc["content"]
+            results.append(entry)
         return results
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Zero-Token Markdown Knowledge RAG Vault for AI Agents.")
     parser.add_argument("vault", help="Path to local Markdown or Obsidian vault directory")
-    parser.add_argument("--query", "-q", required=True, help="Search query to retrieve relevant context notes")
+    parser.add_argument("--query", "-q", default=None, help="Search query to retrieve relevant context notes")
+    parser.add_argument("--list-tags", action="store_true", help="List all unique tags indexed across the vault with note counts")
+    parser.add_argument("--full", action="store_true", help="Include complete note markdown content in output")
     parser.add_argument("--limit", "-k", type=int, default=5, help="Number of matching documents to return (default: 5)")
     parser.add_argument("--min-score", "-m", type=float, default=0.0, help="Minimum BM25 score cutoff threshold (default: 0.0)")
     parser.add_argument("--tag", "-t", help="Filter results by tag (e.g. 'sop' or '#finance')")
