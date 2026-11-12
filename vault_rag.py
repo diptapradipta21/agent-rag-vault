@@ -27,8 +27,10 @@ class MarkdownRAGVault:
         self.avg_doc_len = 0.0
         self.total_docs = 0
 
-    def tokenize(self, text: str) -> List[str]:
+    def tokenize(self, text: Optional[str]) -> List[str]:
         """Clean and extract alphanumeric search tokens."""
+        if not text:
+            return []
         return re.findall(r'\b[a-zA-Z0-9_-]{2,}\b', text.lower())
 
     def extract_tags(self, content: str) -> Set[str]:
@@ -221,7 +223,28 @@ def main() -> None:
     ext_list = [e.strip() for e in args.extensions.split(",") if e.strip()]
     vault = MarkdownRAGVault(args.vault, extensions=ext_list)
     vault.index(quiet=(args.json or args.quiet))
-    results = vault.query(args.query, top_k=args.limit, min_score=args.min_score, tag=args.tag)
+    if args.list_tags:
+        tags = vault.list_tags()
+        if args.json:
+            print(json.dumps(tags, indent=2))
+        else:
+            print(f"\n🏷️  Indexed Tags ({len(tags)} unique):\n")
+            for t, count in tags.items():
+                print(f"  • #{t}: {count} note(s)")
+            print()
+        sys.exit(0)
+
+    if not args.query:
+        print("[!] Error: Either --query or --list-tags is required.", file=sys.stderr)
+        sys.exit(1)
+
+    results = vault.query(
+        args.query,
+        top_k=args.limit,
+        min_score=args.min_score,
+        tag=args.tag,
+        include_content=args.full
+    )
 
     if args.json:
         print(json.dumps(results, indent=2))
@@ -231,8 +254,9 @@ def main() -> None:
     for idx, r in enumerate(results, 1):
         tag_str = f" [{', '.join(r['tags'])}]" if r.get("tags") else ""
         print(f"{idx}. [{r['score']}] {r['title']} ({r['path']}){tag_str}")
-        print(f"   Excerpt: {r['excerpt']}\n")
-
-
+        print(f"   Excerpt: {r['excerpt']}")
+        if args.full and "content" in r:
+            print(f"\n--- Content ---\n{r['content']}\n---------------")
+        print()
 if __name__ == "__main__":
     main()

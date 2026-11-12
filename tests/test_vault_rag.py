@@ -21,6 +21,12 @@ class TestMarkdownRAGVault(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
+    def test_tokenize_none_or_empty(self):
+        vault = MarkdownRAGVault(str(self.vault_path))
+        self.assertEqual(vault.tokenize(None), [])
+        self.assertEqual(vault.tokenize(""), [])
+        self.assertEqual(vault.query(None), [])
+
     def test_tokenize(self):
         vault = MarkdownRAGVault(str(self.vault_path))
         tokens = vault.tokenize("Hello World! Quick brown fox 123_456.")

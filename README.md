@@ -42,6 +42,9 @@ python3 vault_rag.py /path/to/obsidian-vault -q "Yoast SEO rules" --min-score 2.
 
 ## 🛠️ CLI Flags
 - `--query, -q`: Search terms to rank against indexed notes.
+- `--list-tags`: Discover all unique frontmatter and hashtag taxonomies with note counts.
+- `--full`: Include complete markdown document body in retrieval payload.
+- `--tag, -t`: Filter matching notes by specific tag (e.g. `sop` or `#finance`).
 - `--limit, -k`: Max items to return (default: 5).
 - `--min-score, -m`: Minimum BM25 cutoff threshold (default: 0.0).
 - `--json`: Output clean JSON array (progress logs automatically redirected to `stderr`).
