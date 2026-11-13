@@ -130,6 +130,18 @@ class MarkdownRAGVault:
         if not quiet:
             print(f"[✓] Indexed {self.total_docs} notes (Avg tokens: {self.avg_doc_len:.1f}).", file=sys.stderr)
 
+    def get_vault_stats(self) -> Dict[str, Any]:
+        """Return diagnostic metrics: total docs, total tokens, average length, unique tags."""
+        tags = self.list_tags()
+        total_tokens = sum(doc.get("length", 0) for doc in self.documents)
+        return {
+            "total_notes": self.total_docs,
+            "total_tokens": total_tokens,
+            "avg_tokens_per_note": round(self.avg_doc_len, 1),
+            "unique_tags_count": len(tags),
+            "top_tags": dict(list(tags.items())[:10]),
+        }
+
     def list_tags(self) -> Dict[str, int]:
         """Aggregate and count frequency of all tags across indexed documents."""
         tag_counts: Counter = Counter()
@@ -210,6 +222,8 @@ def main() -> None:
     parser.add_argument("vault", help="Path to local Markdown or Obsidian vault directory")
     parser.add_argument("--query", "-q", default=None, help="Search query to retrieve relevant context notes")
     parser.add_argument("--list-tags", action="store_true", help="List all unique tags indexed across the vault with note counts")
+    parser.add_argument("--stats", action="store_true", help="Display diagnostic summary statistics of the indexed vault")
+
     parser.add_argument("--full", action="store_true", help="Include complete note markdown content in output")
     parser.add_argument("--limit", "-k", type=int, default=5, help="Number of matching documents to return (default: 5)")
     parser.add_argument("--min-score", "-m", type=float, default=0.0, help="Minimum BM25 score cutoff threshold (default: 0.0)")
@@ -223,6 +237,23 @@ def main() -> None:
     ext_list = [e.strip() for e in args.extensions.split(",") if e.strip()]
     vault = MarkdownRAGVault(args.vault, extensions=ext_list)
     vault.index(quiet=(args.json or args.quiet))
+    if args.stats:
+        stats = vault.get_vault_stats()
+        if args.json:
+            print(json.dumps(stats, indent=2))
+        else:
+            print(f"\n📊 Vault Summary Statistics ({args.vault}):\n")
+            print(f"  • Total Notes: {stats['total_notes']}")
+            print(f"  • Total Tokens: {stats['total_tokens']:,}")
+            print(f"  • Avg Tokens/Note: {stats['avg_tokens_per_note']}")
+            print(f"  • Unique Tags: {stats['unique_tags_count']}")
+            if stats["top_tags"]:
+                print("  • Top Tags:")
+                for t, cnt in stats["top_tags"].items():
+                    print(f"      #{t}: {cnt}")
+            print()
+        sys.exit(0)
+
     if args.list_tags:
         tags = vault.list_tags()
         if args.json:
@@ -234,7 +265,7 @@ def main() -> None:
             print()
         sys.exit(0)
 
-    if not args.query:
+    if not args.query and not args.stats and not args.list_tags:
         print("[!] Error: Either --query or --list-tags is required.", file=sys.stderr)
         sys.exit(1)
 

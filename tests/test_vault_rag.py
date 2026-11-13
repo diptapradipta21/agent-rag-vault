@@ -123,5 +123,21 @@ class TestMarkdownRAGVault(unittest.TestCase):
         self.assertIn("content", res_with_content[0])
         self.assertEqual(res_with_content[0]["content"], body)
 
+
+    def test_get_vault_stats(self):
+        doc1 = self.vault_path / "doc1.md"
+        doc1.write_text("---\ntags: [devops, infra]\n---\n# Deployment\nKubernetes swarm docker orchestration.", encoding="utf-8")
+        doc2 = self.vault_path / "doc2.md"
+        doc2.write_text("# Monitoring\nPrometheus grafana metrics alert #devops", encoding="utf-8")
+
+        vault = MarkdownRAGVault(str(self.vault_path))
+        vault.index(quiet=True)
+        stats = vault.get_vault_stats()
+
+        self.assertEqual(stats["total_notes"], 2)
+        self.assertGreater(stats["total_tokens"], 0)
+        self.assertEqual(stats["unique_tags_count"], 2)
+        self.assertEqual(stats["top_tags"].get("devops"), 2)
+
 if __name__ == "__main__":
     unittest.main()
