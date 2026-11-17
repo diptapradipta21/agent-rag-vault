@@ -27,6 +27,21 @@ class TestMarkdownRAGVault(unittest.TestCase):
         self.assertEqual(vault.tokenize(""), [])
         self.assertEqual(vault.query(None), [])
 
+    def test_index_prunes_dependency_and_hidden_dirs(self):
+        (self.vault_path / "real-note.md").write_text("Deployment checklist for docker.", encoding="utf-8")
+        dep_dir = self.vault_path / "node_modules" / "pkg"
+        dep_dir.mkdir(parents=True)
+        (dep_dir / "readme.md").write_text("Bundled dependency docs.", encoding="utf-8")
+        hidden_dir = self.vault_path / ".obsidian"
+        hidden_dir.mkdir()
+        (hidden_dir / "workspace.md").write_text("Editor workspace note.", encoding="utf-8")
+
+        vault = MarkdownRAGVault(str(self.vault_path))
+        vault.index(quiet=True)
+
+        self.assertEqual(vault.total_docs, 1)
+        self.assertEqual(vault.documents[0]["rel_path"], "real-note.md")
+
     def test_tokenize(self):
         vault = MarkdownRAGVault(str(self.vault_path))
         tokens = vault.tokenize("Hello World! Quick brown fox 123_456.")

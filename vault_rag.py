@@ -18,6 +18,9 @@ import sys
 from typing import Any, Dict, List, Optional, Set
 
 
+SKIP_DIRS = frozenset({"node_modules", "venv", "env", "dist", "build", "__pycache__", "site-packages"})
+
+
 class MarkdownRAGVault:
     def __init__(self, vault_path: str, extensions: Optional[List[str]] = None):
         self.vault_path = Path(vault_path).resolve()
@@ -85,8 +88,9 @@ class MarkdownRAGVault:
                 continue
             if p.suffix.lower() not in self.extensions:
                 continue
-            # Exclude hidden files, git, and node_modules
-            if any(part.startswith(".") for part in p.parts):
+            # Exclude hidden dirs, git internals, and dependency trees
+            parts = p.relative_to(self.vault_path).parts[:-1]
+            if any(part.startswith(".") or part in SKIP_DIRS for part in parts):
                 continue
             if count >= max_files:
                 break
