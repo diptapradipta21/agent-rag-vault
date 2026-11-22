@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -156,3 +157,21 @@ class TestMarkdownRAGVault(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCLI(unittest.TestCase):
+    script = Path(__file__).resolve().parent.parent / "vault_rag.py"
+
+    def test_version_flag(self):
+        proc = subprocess.run([sys.executable, str(self.script), "--version"], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("agent-rag-vault 1.1.0", proc.stdout)
+
+    def test_missing_vault_path_fails_fast(self):
+        proc = subprocess.run(
+            [sys.executable, str(self.script), "/nonexistent/vault-xyz", "-q", "deploy"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("does not exist", proc.stderr)
+        self.assertEqual(proc.stdout, "")

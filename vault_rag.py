@@ -18,6 +18,9 @@ import sys
 from typing import Any, Dict, List, Optional, Set
 
 
+__version__ = "1.1.0"
+
+
 SKIP_DIRS = frozenset({"node_modules", "venv", "env", "dist", "build", "__pycache__", "site-packages"})
 
 
@@ -223,6 +226,7 @@ class MarkdownRAGVault:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Zero-Token Markdown Knowledge RAG Vault for AI Agents.")
+    parser.add_argument("--version", action="version", version=f"agent-rag-vault {__version__}")
     parser.add_argument("vault", help="Path to local Markdown or Obsidian vault directory")
     parser.add_argument("--query", "-q", default=None, help="Search query to retrieve relevant context notes")
     parser.add_argument("--list-tags", action="store_true", help="List all unique tags indexed across the vault with note counts")
@@ -238,8 +242,13 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    vault_path = Path(args.vault).expanduser()
+    if not vault_path.is_dir():
+        print(f"[!] Error: vault path does not exist or is not a directory: {vault_path}", file=sys.stderr)
+        sys.exit(2)
+
     ext_list = [e.strip() for e in args.extensions.split(",") if e.strip()]
-    vault = MarkdownRAGVault(args.vault, extensions=ext_list)
+    vault = MarkdownRAGVault(str(vault_path), extensions=ext_list)
     vault.index(quiet=(args.json or args.quiet))
     if args.stats:
         stats = vault.get_vault_stats()
