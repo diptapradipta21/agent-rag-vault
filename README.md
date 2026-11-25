@@ -49,6 +49,7 @@ python3 vault_rag.py /path/to/obsidian-vault -q "Yoast SEO rules" --min-score 2.
 - `--min-score, -m`: Minimum BM25 cutoff threshold (default: 0.0).
 - `--json`: Output clean JSON array (progress logs automatically redirected to `stderr`).
 - `--version`: Print the CLI version and exit.
+- `--exclude`: Comma-separated glob patterns to skip while indexing (e.g. `archive/*,*.tmp.md`).
 
 Invalid vault paths now fail fast with exit code `2` instead of silently indexing zero notes.
 - `--quiet`: Suppress indexing progress output.

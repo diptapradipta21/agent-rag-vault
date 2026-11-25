@@ -165,7 +165,7 @@ class TestCLI(unittest.TestCase):
     def test_version_flag(self):
         proc = subprocess.run([sys.executable, str(self.script), "--version"], capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0)
-        self.assertIn("agent-rag-vault 1.1.0", proc.stdout)
+        self.assertIn("agent-rag-vault 1.1.1", proc.stdout)
 
     def test_missing_vault_path_fails_fast(self):
         proc = subprocess.run(

@@ -8,6 +8,7 @@ Provides instant retrieval for Claude Code, Hermes, and local agents with 0 LLM 
 from __future__ import annotations
 
 import argparse
+import fnmatch
 from collections import Counter
 import json
 import math
@@ -18,15 +19,16 @@ import sys
 from typing import Any, Dict, List, Optional, Set
 
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 
 SKIP_DIRS = frozenset({"node_modules", "venv", "env", "dist", "build", "__pycache__", "site-packages"})
 
 
 class MarkdownRAGVault:
-    def __init__(self, vault_path: str, extensions: Optional[List[str]] = None):
+    def __init__(self, vault_path: str, extensions: Optional[List[str]] = None, exclude: Optional[List[str]] = None):
         self.vault_path = Path(vault_path).resolve()
+        self.exclude = [pat.strip() for pat in (exclude or []) if pat.strip()]
         self.extensions = set(ext.lower() if ext.startswith(".") else f".{ext.lower()}" for ext in (extensions or [".md", ".markdown"]))
         self.documents: List[Dict[str, Any]] = []
         self.doc_freqs: Counter = Counter()
@@ -92,7 +94,14 @@ class MarkdownRAGVault:
             if p.suffix.lower() not in self.extensions:
                 continue
             # Exclude hidden dirs, git internals, and dependency trees
-            parts = p.relative_to(self.vault_path).parts[:-1]
+            rel_path = p.relative_to(self.vault_path)
+            parts = rel_path.parts[:-1]
+            if self.exclude and any(
+                fnmatch.fnmatch(rel_path.as_posix(), pat)
+                or any(fnmatch.fnmatch(segment, pat) for segment in rel_path.parts)
+                for pat in self.exclude
+            ):
+                continue
             if any(part.startswith(".") or part in SKIP_DIRS for part in parts):
                 continue
             if count >= max_files:
@@ -237,6 +246,7 @@ def main() -> None:
     parser.add_argument("--min-score", "-m", type=float, default=0.0, help="Minimum BM25 score cutoff threshold (default: 0.0)")
     parser.add_argument("--tag", "-t", help="Filter results by tag (e.g. 'sop' or '#finance')")
     parser.add_argument("--extensions", default=".md,.markdown", help="Comma-separated file extensions to index (default: .md,.markdown)")
+    parser.add_argument("--exclude", default="", help="Comma-separated glob patterns to skip (e.g. \"archive/*,*.tmp\")")
     parser.add_argument("--json", action="store_true", help="Output results in clean JSON format for agent tool ingestion")
     parser.add_argument("--quiet", action="store_true", help="Suppress indexing progress output")
 
@@ -248,7 +258,8 @@ def main() -> None:
         sys.exit(2)
 
     ext_list = [e.strip() for e in args.extensions.split(",") if e.strip()]
-    vault = MarkdownRAGVault(str(vault_path), extensions=ext_list)
+    exclude_list = [e.strip() for e in args.exclude.split(",") if e.strip()]
+    vault = MarkdownRAGVault(str(vault_path), extensions=ext_list, exclude=exclude_list)
     vault.index(quiet=(args.json or args.quiet))
     if args.stats:
         stats = vault.get_vault_stats()
@@ -279,7 +290,7 @@ def main() -> None:
         sys.exit(0)
 
     if not args.query and not args.stats and not args.list_tags:
-        print("[!] Error: Either --query or --list-tags is required.", file=sys.stderr)
+        print("[!] Error: Either --query, --list-tags, or --stats is required.", file=sys.stderr)
         sys.exit(1)
 
     results = vault.query(
@@ -303,4 +314,8 @@ def main() -> None:
             print(f"\n--- Content ---\n{r['content']}\n---------------")
         print()
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BrokenPipeError:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(0)
